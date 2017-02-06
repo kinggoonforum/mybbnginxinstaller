@@ -1,0 +1,100 @@
+#!/bin/bash
+
+clear
+
+echo 'Installing The Atomic aka A.R.T. (Atomic Rocket Turtle) RPM repository'
+wget -q -O - https://www.atomicorp.com/installers/atomic | sh
+
+echo 'Installing MySQL Server'
+echo '------------------------'
+read -p "MySQL Password: " mysqlPassword
+read -p "Retype password: " mysqlPasswordRetype
+
+yum install -y mysql-server
+
+
+service mysqld restart
+
+while [[ "$mysqlPassword" = "" && "$mysqlPassword" != "$mysqlPasswordRetype" ]]; do
+  echo -n "Please enter the desired mysql root password: "
+  stty -echo
+  read -r mysqlPassword
+  echo
+  echo -n "Retype password: "
+  read -r mysqlPasswordRetype
+  stty echo
+  echo
+  if [ "$mysqlPassword" != "$mysqlPasswordRetype" ]; then
+    echo "Passwords do not match!"
+  fi
+done
+
+/usr/bin/mysqladmin -u root password $mysqlPassword
+
+echo 'Installing Nginx'
+yum install -y nginx
+sudo /etc/init.d/nginx start
+
+echo 'Installing php-fpm,php-mysql and php-gd'
+yum install -y php-fpm php-mysql php-gd
+
+echo 'Set Up Autostart'
+sudo chkconfig --levels 235 mysqld on
+sudo chkconfig --levels 235 nginx on
+sudo chkconfig --levels 235 php-fpm on
+
+yum install -y unzip
+wget https://resources.mybb.com/downloads/mybb_1810.zip -P /usr/share/nginx
+unzip /usr/share/nginx/mybb_1810.zip -d /usr/share/nginx/
+mv /usr/share/nginx/html/index.html /usr/share/nginx/html/index.html.bak
+mv /usr/share/nginx/Upload/* /usr/share/nginx/html
+
+chmod 777 /usr/share/nginx/html/inc/settings.php
+chmod 777 /usr/share/nginx/html/inc/config.default.php
+mv /usr/share/nginx/html/inc/config.default.php /usr/share/nginx/html/inc/config.php
+chmod 777 /usr/share/nginx/html/cache
+chmod 777 /usr/share/nginx/html/admin/backups
+chmod 777 /usr/share/nginx/html/cache/themes
+chmod 777 /usr/share/nginx/html/inc/languages
+chmod 777 /usr/share/nginx/html/uploads
+chmod 777 /usr/share/nginx/html/uploads/avatars
+
+
+
+mv /etc/nginx/conf.d/default.conf /etc/nginx/conf.d/default.conf.bak
+wget https://bitbucket.org/UBOAAAA/nginx-stuff/raw/5424ca7ad294346038f26c12a5da4cca39da36ba/forum.conf -P /etc/nginx/conf.d
+
+echo 'Securing PHP with the php.ini'
+mv /etc/php.ini /etc/php.ini.bak
+wget https://bitbucket.org/UBOAAAA/nginx-stuff/raw/4c7a23515f299e3f375c646d38fc70a7a26a69f2/php.ini -P /etc
+
+echo 'Securing nginx.conf and adding gzip'
+mv /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
+wget https://bitbucket.org/UBOAAAA/nginx-stuff/raw/4c7a23515f299e3f375c646d38fc70a7a26a69f2/nginx.conf -P /etc/nginx
+
+echo 'Replacing apache in the user and group with nginx'
+mv /etc/php-fpm.d/www.conf /etc/php-fpm.d/www.conf.bak
+wget https://bitbucket.org/UBOAAAA/nginx-stuff/raw/4c7a23515f299e3f375c646d38fc70a7a26a69f2/www.conf -P /etc/php-fpm.d
+
+echo 'Restart everything'
+service mysqld restart
+service php-fpm restart
+service nginx restart
+
+
+echo 'Installing Webmin'
+echo '[webmin]' >> /etc/yum.repos.d/webmin.repo
+echo 'name=Webmin Distribution Neutral' >> /etc/yum.repos.d/webmin.repo
+echo 'baseurl=http://download.webmin.com/download/yum' >> /etc/yum.repos.d/webmin.repo
+echo 'mirrorlist=http://download.webmin.com/download/yum/mirrorlist' >> /etc/yum.repos.d/webmin.repo
+echo 'gpgcheck=0' >> /etc/yum.repos.d/webmin.repo
+echo 'enabled=1' >> /etc/yum.repos.d/webmin.repo
+
+yum install -y webmin
+
+echo 'run sudo /usr/bin/mysql_secure_installation to finish the basic MySQL configuration'
+echo 'add your domain name in the /etc/nginx/conf.d/forum.conf file'
+echo 'login to webmin and create a database and database user for your mybb installation'
+echo 'mybbnginxinstaller finished'
+
+
